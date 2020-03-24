@@ -1,0 +1,260 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name of the function app that you wish to create."
+            }
+        },
+        "storageAccountType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS"
+            ],
+            "metadata": {
+                "description": "Storage Account type"
+            }
+        },
+        "locations": {
+            "type": "array",
+            "defaultValue": [
+                "eastasia",
+                "southeastasia",
+                "centralus",
+                "eastus",
+                "eastus2",
+                "westus",
+                "northcentralus",
+                "southcentralus",
+                "northeurope",
+                "westeurope",
+                "japaneast",
+                "brazilsouth",
+                "australiaeast",
+                "australiasoutheast",
+                "canadacentral",
+                "uksouth",
+                "westus2",
+                "koreacentral",
+                "francecentral",
+                "southafricanorth",
+                "switzerlandnorth"
+            ],
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
+        "runtime": {
+            "type": "string",
+            "defaultValue": "dotnet",
+            "allowedValues": [
+                "node",
+                "dotnet",
+                "java"
+            ],
+            "metadata": {
+                "description": "The language worker runtime to load in the function app."
+            }
+        }
+    },
+    "variables": {
+        "functionWorkerRuntime": "[parameters('runtime')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[concat(parameters('appName'),parameters('locations')[copyIndex()])]",
+            "apiVersion": "2018-07-01",
+            "location": "[parameters('locations')[copyIndex()]]",
+            "kind": "Storage",
+            "copy": {
+                "name": "storagecopy",
+                "count": "[length(parameters('locations'))]"
+            },
+            "sku": {
+                "name": "[parameters('storageAccountType')]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[concat(parameters('appName'),parameters('locations')[copyIndex()])]",
+            "location": "[parameters('locations')[copyIndex()]]",
+            "sku": {
+                "name": "Y1",
+                "tier": "Dynamic"
+            },
+            "copy": {
+                "name": "serverfarmcopy",
+                "count": "[length(parameters('locations'))]"
+            },
+            "properties": {
+                "name": "[concat(parameters('appName'),parameters('locations')[copyIndex()])]",
+                "computeMode": "Dynamic"
+            }
+        },
+        {
+            "apiVersion": "2015-08-01",
+            "type": "Microsoft.Web/sites",
+            "name": "[concat(parameters('appName'),parameters('locations')[copyIndex()])]",
+            "location": "[parameters('locations')[copyIndex()]]",
+            "kind": "functionapp",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', concat(parameters('appName'),parameters('locations')[copyIndex()]))]",
+                "[resourceId('Microsoft.Storage/storageAccounts', concat(parameters('appName'),parameters('locations')[copyIndex()]))]"
+            ],
+            "copy": {
+                "name": "functioncopy",
+                "count": "[length(parameters('locations'))]"
+            },
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat(parameters('appName'),parameters('locations')[copyIndex()]))]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "AzureWebJobsDisableHomepage",
+                            "value": true
+                        },
+                        {
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat(parameters('appName'),parameters('locations')[copyIndex()]), ';AccountKey=', listKeys(concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', parameters('appName'),parameters('locations')[copyIndex()]),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat(parameters('appName'),parameters('locations')[copyIndex()]), ';AccountKey=', listKeys(concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', parameters('appName'),parameters('locations')[copyIndex()]),'2015-05-01-preview').key1)]"
+                        },
+                        {
+                            "name": "WEBSITE_CONTENTSHARE",
+                            "value": "[concat(parameters('appName'),parameters('locations')[copyIndex()])]"
+                        },
+                        {
+                            "name": "FUNCTIONS_EXTENSION_VERSION",
+                            "value": "~2"
+                        },
+                        {
+                            "name": "WEBSITE_NODE_DEFAULT_VERSION",
+                            "value": "~10"
+                        },
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(resourceId('microsoft.insights/components/', parameters('appName')), '2015-05-01').InstrumentationKey]"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "[variables('functionWorkerRuntime')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "apiVersion": "2015-05-01",
+            "name": "[parameters('appName')]",
+            "type": "microsoft.insights/components",
+            "location": "[resourceGroup().location]",
+            "tags": {
+            },
+            "properties": {
+                "Application_Type": "other",
+                "ApplicationId": "[concat(parameters('appName'),resourceGroup().location)]"
+            }
+        },
+        {
+            "apiVersion": "2018-08-01",
+            "type": "Microsoft.Network/frontDoors",
+            "name": "[concat(parameters('appName'),'fd')]",
+            "location": "global",
+            "tags": {
+            },
+            "properties": {
+                "routingRules": [
+                    {
+                        "name": "routingRule1",
+                        "properties": {
+                            "frontendEndpoints": [
+                                {
+                                    "id": "[resourceId('Microsoft.Network/frontDoors/frontendEndpoints', concat(parameters('appName'),'fd'), 'frontendEndpoint1')]"
+                                }
+                            ],
+                            "acceptedProtocols": [
+                                "Http",
+                                "Https"
+                            ],
+                            "patternsToMatch": [
+                                "/*"
+                            ],
+                            "forwardingProtocol": "MatchRequest",
+                            "backendPool": {
+                                "id": "[resourceId('Microsoft.Network/frontDoors/backendPools', concat(parameters('appName'),'fd'), 'backendPool1')]"
+                            },
+                            "enabledState": "Enabled"
+                        }
+                    }
+                ],
+                "healthProbeSettings": [
+                    {
+                        "name": "healthProbeSettings1",
+                        "properties": {
+                            "path": "/",
+                            "protocol": "Http",
+                            "intervalInSeconds": 120
+                        }
+                    }
+                ],
+                "loadBalancingSettings": [
+                    {
+                        "name": "loadBalancingSettings1",
+                        "properties": {
+                            "sampleSize": 4,
+                            "successfulSamplesRequired": 2
+                        }
+                    }
+                ],
+                "backendPools": [
+                    {
+                        "name": "backendPool1",
+                        "properties": {
+                            "copy": [
+                                {
+                                    "name": "backends",
+                                    "count": "[length(parameters('locations'))]",
+                                    "input": {
+                                        "address": "[concat(parameters('appName'),parameters('locations')[copyIndex('backends')],'.azurewebsites.net')]",
+                                        "backendHostHeader": "[concat(parameters('appName'),parameters('locations')[copyIndex('backends')],'.azurewebsites.net')]",
+                                        "httpPort": 80,
+                                        "httpsPort": 443,
+                                        "weight": 50,
+                                        "priority": 1,
+                                        "enabledState": "Enabled"
+                                    }
+                                }
+                            ],
+                            "loadBalancingSettings": {
+                                "id": "[resourceId('Microsoft.Network/frontDoors/loadBalancingSettings', concat(parameters('appName'),'fd'), 'loadBalancingSettings1')]"
+                            },
+                            "healthProbeSettings": {
+                                "id": "[resourceId('Microsoft.Network/frontDoors/healthProbeSettings', concat(parameters('appName'),'fd'), 'healthProbeSettings1')]"
+                            }
+                        }
+                    }
+
+                ],
+                "frontendEndpoints": [
+                    {
+                        "name": "frontendEndpoint1",
+                        "properties": {
+                            "hostName": "[concat(parameters('appName'),'fd', '.azurefd.net')]",
+                            "sessionAffinityEnabledState": "Disabled"
+                        }
+                    }
+                ],
+                "enabledState": "Enabled"
+            }
+        }
+    ]
+}
