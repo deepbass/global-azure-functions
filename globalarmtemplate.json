@@ -27,7 +27,6 @@
                 "southeastasia",
                 "centralus",
                 "eastus",
-                "eastus2",
                 "westus",
                 "northcentralus",
                 "southcentralus",
@@ -35,15 +34,10 @@
                 "westeurope",
                 "japaneast",
                 "brazilsouth",
-                "australiaeast",
                 "australiasoutheast",
                 "canadacentral",
                 "uksouth",
-                "westus2",
-                "koreacentral",
-                "francecentral",
-                "southafricanorth",
-                "switzerlandnorth"
+                "southafricanorth"
             ],
             "metadata": {
                 "description": "Location for all resources."

@@ -2,7 +2,7 @@ param(
      [string]
      $Name = "x"
 )
-$Regions = "eastasia","southeastasia","centralus","eastus", "eastus2", "westus", "northcentralus", "southcentralus",  "northeurope","westeurope", "japaneast", "brazilsouth", "australiaeast", "australiasoutheast", "canadacentral", "uksouth", "westus2", "koreacentral", "francecentral", "southafricanorth","switzerlandnorth"
+$Regions = "eastasia","southeastasia","centralus","eastus", "westus", "northcentralus", "southcentralus",  "northeurope","westeurope", "japaneast", "brazilsouth", "australiasoutheast", "canadacentral", "uksouth", "southafricanorth"
 
 $Regions | ForEach-Object -Parallel {
     func azure functionapp publish "$($using:Name)$($_)"
